@@ -1,0 +1,117 @@
+- name: Get OS facts
+  set_fact:
+    device_info:
+      name: "{{ ansible_distribution }}"
+      version: "{{ ansible_distribution_version }}"
+
+- name: interfaces
+  set_fact:
+    network_info: "{{ network_info | default([]) + [{'address': ansible_facts[item]['ipv4']['address'] if ansible_facts[item].ipv4 is defined else '', 'name': item}]}}"
+  with_items: "{{ ansible_interfaces }}"
+
+- block:
+    - name: packages info
+      ansible.builtin.package_facts:
+        manager: auto
+      register: package_facts
+
+    - name: convert to list
+      set_fact:
+        packages_info: "{{ package_facts.ansible_facts.packages | dict2items | map(attribute='value') | list }}"
+  when: export_cmdb_package_list
+
+- name: get all users
+  getent:
+    database: passwd
+
+- name: get sudo users
+  getent:
+    database: group
+    key: sudo
+    split: ':'
+
+- name: extract sudo users
+  set_fact:
+    sudo_list: "{{ ansible_facts.getent_group.sudo[2] | split(',') }}"
+
+- name: create user information list
+  set_fact:
+    users: "{{ users | default([]) + [item.key] }}"
+  loop: "{{ ansible_facts.getent_passwd | dict2items }}"
+  when: item.value[1] | int > 999 or item.key == 'root'
+
+- name: Check authorized_keys
+  ansible.builtin.stat:
+    path: "/home/{{ item }}/.ssh/authorized_keys"
+  loop: "{{ users }}"
+  register: ssh_key_status_home
+
+- name: localhost tasks
+  block:
+    - name: Create JSON file
+      set_fact:
+        json_payload: |
+              {
+              "catalog": {{ export_cmdb_catalog | to_nice_json }},
+              "host":
+              {
+              "hostname": {{ ansible_hostname | to_nice_json }},
+              "os":
+                  {{ device_info | to_nice_json }},
+              "ip": [
+                {% for item in network_info %}
+                {
+                    "address": "{{ item.address }}",
+                    "name": "{{ item.name }}"
+                    }{{ '' if loop.last else ',' }}
+                {% endfor %}
+              ],
+
+              "users": [
+                  {% for user, ssh_status in users|zip(ssh_key_status_home.results) %}
+                      {
+                          "name": "{{ user }}",
+                          "sudo": "{% if user in sudo_list %}true{% else %}false{% endif %}",
+                          "ssh": "{% if ssh_status.stat.exists %}true{% else %}false{% endif %}",
+                          "aut": "{% if ssh_status.stat.exists %}key{% else %}pass{% endif %}"
+                      }{{ '' if loop.last else ',' }}
+                        {% endfor %}
+              ],
+              {% if export_cmdb_package_list %}
+              "packages": [
+                  {% for package in packages_info %}
+                {
+                      "name": "{{ package[0].name }}",
+                      "version": "{{ package[0].version }}"
+
+                    }{{ '' if loop.last else ',' }}
+                  {% endfor %}
+                    ]
+              {% endif %}
+              }
+
+    - name: create test json file
+      copy:
+        content: "{{ json_payload }}"
+        dest: "/tmp/{{ ansible_hostname }}.json"
+
+    - name: POST local file
+      ansible.builtin.uri:
+        url: "{{ export_cmdb_url }}"
+        method: POST
+        body: "{{ json_payload }}"
+        status_code: 200
+        headers:
+          Authorization: "Basic {{ export_cmdb_auth_token }}"
+        return_content: yes
+      throttle: 1 # maybe 2-3. or 99% fail query
+      register: response_variable
+      until: response_variable.status == 200
+      retries: 4
+      delay: 3
+      delegate_to: localhost
+
+    - name: Output response
+      debug:
+        var: response_variable.content
+  delegate_to: localhost

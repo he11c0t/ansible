@@ -1,0 +1,5 @@
+---
+export_cmdb_url: "http:"
+export_cmdb_catalog: "ansible"
+export_cmdb_auth_token: "YourSecretTokenHere"
+export_cmdb_package_list: true
