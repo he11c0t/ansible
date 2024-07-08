@@ -1,0 +1,23 @@
+- name: create user haproxy_exporter
+  user:
+    name: haproxy_exporter
+    shell: /sbin/nologin
+
+- name: unpack haproxy_exporter
+  unarchive:
+    src: "{{ haproxy_exporter_download_url }}"
+    dest: "{{ haproxy_exporter_binary_dir }}"
+    mode: 755
+    remote_src: true
+    keep_newer: true
+    extra_opts:
+      - "--strip-components=1"
+      - "--show-stored-names"
+    creates: "{{ haproxy_exporter_binary_dir }}/haproxy_exporter"
+
+- name: copy systemd unit
+  template:
+    src: haproxy_exporter.service.j2
+    dest: /lib/systemd/system/haproxy_exporter.service
+  notify: haproxy_exporter restart
+

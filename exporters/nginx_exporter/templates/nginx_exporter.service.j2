@@ -1,0 +1,10 @@
+[Unit]
+Description=Nginx Exporter
+
+[Service]
+User=nginx_exporter
+Group=nginx_exporter
+ExecStart={{ nginx_exporter_binary_dir }}/nginx-prometheus-exporter {{ nginx_exporter_start_options }}
+
+[Install]
+WantedBy=multi-user.target

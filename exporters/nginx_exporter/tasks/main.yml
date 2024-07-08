@@ -1,0 +1,22 @@
+- name: create user nginx_exporter
+  user:
+    name: nginx_exporter
+    shell: /sbin/nologin
+
+- name: unpack nginx_exporter
+  unarchive:
+    src: "{{ nginx_exporter_download_url }}"
+    dest: "{{ nginx_exporter_binary_dir }}"
+    mode: 755
+    remote_src: true
+    keep_newer: true
+    include:
+      - 'nginx-prometheus-exporter'
+  notify: nginx_exporter restart
+
+- name: copy systemd unit
+  template:
+    src: nginx_exporter.service.j2
+    dest: /lib/systemd/system/nginx_exporter.service
+  notify: nginx_exporter restart
+

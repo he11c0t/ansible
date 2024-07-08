@@ -1,0 +1,10 @@
+[Unit]
+Description=Node Exporter
+
+[Service]
+User=node_exporter
+Group=node_exporter
+ExecStart={{ node_exporter_binary_file }} {{ node_exporter_start_options }}
+
+[Install]
+WantedBy=multi-user.target

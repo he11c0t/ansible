@@ -1,0 +1,10 @@
+[Unit]
+Description=Haproxy Exporter
+
+[Service]
+User=haproxy_exporter
+Group=haproxy_exporter
+ExecStart={{ haproxy_exporter_binary_dir }}/haproxy_exporter {{ haproxy_exporter_start_options }}
+
+[Install]
+WantedBy=multi-user.target

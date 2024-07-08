@@ -1,0 +1,24 @@
+- name: create user bind_exporter
+  user:
+    name: bind_exporter
+    shell: /sbin/nologin
+
+- name: unpack bind_exporter
+  unarchive:
+    src: "{{ bind_exporter_download_url }}"
+    dest: "{{ bind_exporter_binary_dir }}"
+    mode: 755
+    remote_src: true
+    #keep_newer: true
+    extra_opts:
+      - "--strip-components=1"
+      - "--show-stored-names"
+    creates: "{{ bind_exporter_binary_dir }}/bind_exporter"
+  notify: bind_exporter restart
+
+- name: copy systemd unit
+  template:
+    src: bind_exporter.service.j2
+    dest: /lib/systemd/system/bind_exporter.service
+  notify: bind_exporter restart
+

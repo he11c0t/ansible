@@ -1,0 +1,22 @@
+- name: create user node_exporter
+  user:
+    name: node_exporter
+    shell: /sbin/nologin
+
+- name: unpack node_exporter
+  unarchive:
+    src: "{{ node_exporter_download_url }}"
+    dest: "{{ node_exporter_binary_dir }}"
+    mode: 755
+    remote_src: true
+    keep_newer: true
+    extra_opts:
+      - "--strip-components=1"
+      - "--show-stored-names"
+  notify: node_exporter restart
+
+- name: copy systemd unit
+  template:
+    src: node_exporter.service.j2
+    dest: /lib/systemd/system/node_exporter.service
+  notify: node_exporter restart
